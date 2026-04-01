@@ -1,0 +1,67 @@
+:root { 
+    --bg: #121212; --card: #1e1e1e; --accent: #00e676; --text: #ffffff;
+    --border: #333; --error: #ff5252;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body { 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+    background: var(--bg); color: var(--text); margin: 0; padding: 10px;
+}
+
+/* Container de App */
+.app-container { max-width: 500px; margin: auto; }
+
+h1 { font-size: 1.5rem; text-align: center; color: var(--accent); }
+
+/* Cartões de Rádio (Botões Grandes) */
+.tipo-operacao { display: flex; gap: 10px; margin-bottom: 15px; }
+.radio-card { 
+    flex: 1; background: var(--card); padding: 15px; border-radius: 10px;
+    text-align: center; border: 2px solid transparent; cursor: pointer;
+}
+.radio-card input { display: none; }
+.radio-card:has(input:checked) { border-color: var(--accent); background: #1a3a2a; }
+
+/* Janela da Câmera */
+.scanner-window { 
+    position: relative; width: 100%; height: 200px; 
+    background: #000; border-radius: 15px; overflow: hidden; margin-bottom: 15px;
+}
+.viewport canvas, .viewport video { width: 100%; height: 100%; object-fit: cover; }
+.scanner-overlay {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 80%; height: 2px; background: var(--error); box-shadow: 0 0 10px var(--error);
+    animation: scan 2s infinite;
+}
+@keyframes scan { 0% { top: 20%; } 100% { top: 80%; } }
+
+.btn-camera {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.6); color: white; border: 1px solid #fff; padding: 5px 15px; border-radius: 20px;
+}
+
+/* Inputs e Botões */
+.inputs-main { display: flex; gap: 10px; margin-bottom: 15px; }
+input { 
+    background: var(--card); border: 1px solid var(--border); color: #fff; 
+    padding: 15px; border-radius: 8px; font-size: 1rem;
+}
+#inputCodigo { flex: 2; }
+#inputQtd { flex: 1; }
+
+.controles-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+.controles-grid button, .btn-label { padding: 12px 5px; font-size: 0.8rem; border-radius: 8px; border: none; font-weight: bold; }
+
+/* Tabelas Mobile */
+.table-responsive { overflow-x: auto; background: var(--card); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.alerta { color: var(--orange); background: rgba(255,152,0,0.1); }
+
+/* Tabs */
+.tabs { display: flex; justify-content: space-around; border-bottom: 2px solid var(--border); margin-bottom: 10px; }
+.tabs h3 { font-size: 1rem; padding-bottom: 5px; cursor: pointer; opacity: 0.5; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
