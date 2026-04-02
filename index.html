@@ -97,47 +97,48 @@
 
     /* --- LÓGICA DA CÂMERA MELHORADA --- */
 function iniciarLeitor() {
-    // 1. Verificamos se o navegador suporta a câmera
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Erro: Seu navegador não suporta acesso à câmera ou você não está usando HTTPS.");
-        return;
-    }
-
     Quagga.init({
         inputStream: {
             name: "Live",
             type: "LiveStream",
-            target: document.querySelector('#interactive'), // Onde o vídeo aparece
+            target: document.querySelector('#interactive'),
             constraints: {
-                // Força o uso da câmera traseira no celular
-                facingMode: "environment",
                 width: { min: 640 },
-                height: { min: 480 }
+                height: { min: 480 },
+                facingMode: "environment",
+                aspectRatio: { min: 1, max: 2 }
             },
         },
-        decoder: {
-            // Adicionamos mais leitores para aumentar a chance de sucesso
-            readers: ["ean_reader", "code_128_reader", "upc_reader", "code_39_reader"]
+        locator: {
+            patchSize: "medium", // Tamanho da área de busca
+            halfSample: true     // Processa mais rápido em dispositivos móveis
         },
-        locate: true // Ajuda a encontrar o código na imagem
+        numOfWorkers: 2,         // Usa mais núcleos do processador
+        decoder: {
+            // Focamos nos tipos mais comuns para não sobrecarregar o script
+            readers: ["ean_reader", "code_128_reader", "code_39_reader"]
+        },
+        locate: true             // Crucial: Desenha a caixa de busca na tela
     }, function(err) {
-        if (err) {
-            console.error("Erro ao iniciar Quagga:", err);
-            mostrarStatus("Erro ao abrir câmera", "error");
-            cameraAtiva = false;
-            return;
-        }
-        console.log("Quagga iniciado com sucesso");
+        if (err) { console.error(err); return; }
         Quagga.start();
     });
 
+    // Evento de detecção com filtro de confiança
     Quagga.onDetected((data) => {
-        const code = data.codeResult.code;
-        // Evita leituras múltiplas seguidas do mesmo código rapidamente
-        if (document.getElementById('inputCodigo').value !== code) {
+        // Só aceita se a precisão for alta (evita leituras falsas)
+        if (data.codeResult && data.codeResult.decodedCodes[0].error < 0.1) {
+            const code = data.codeResult.code;
             document.getElementById('inputCodigo').value = code;
+            
             if (navigator.vibrate) navigator.vibrate(100);
+            
+            // Pausa um pouco para o usuário ver o que aconteceu
+            Quagga.stop();
             processarLeitura();
+            
+            // Reinicia após 1.5 segundos para a próxima leitura
+            setTimeout(() => { if(cameraAtiva) iniciarLeitor(); }, 1500);
         }
     });
 }
