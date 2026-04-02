@@ -65,3 +65,20 @@ th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid var(--bo
 .tabs h3 { font-size: 1rem; padding-bottom: 5px; cursor: pointer; opacity: 0.5; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
+
+/* Garante que o vídeo preencha o espaço sem distorcer */
+#interactive video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Cria uma moldura visual para ajudar o usuário a centralizar */
+.scanner-window::after {
+    content: "";
+    position: absolute;
+    top: 20%; left: 10%; right: 10%; bottom: 20%;
+    border: 2px dashed rgba(0, 230, 118, 0.5);
+    border-radius: 10px;
+    pointer-events: none;
+}
