@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Almoxarifado App</title>
+    
+    <link rel="stylesheet" href="app.css">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+</head>
+<body>
+
+<div class="app-container">
+    <header class="no-print">
+        <h1>📦 Almoxarifado Pro</h1>
+        <div class="tipo-operacao">
+            <label class="radio-card">
+                <input type="radio" name="tipoOp" value="entrada" checked> 
+                <span>🟢 ENTRADA</span>
+            </label>
+            <label class="radio-card">
+                <input type="radio" name="tipoOp" value="saida"> 
+                <span>🔴 SAÍDA</span>
+            </label>
+        </div>
+    </header>
+
+    <div id="camera-scanner" class="scanner-window no-print">
+        <div id="interactive" class="viewport"></div>
+        <div class="scanner-overlay"></div>
+        <button onclick="toggleCamera()" class="btn-camera">📸 Iniciar/Parar Câmera</button>
+    </div>
+
+    <div class="inputs-main no-print">
+        <input type="text" id="inputCodigo" placeholder="Código de Barras..." autocomplete="off">
+        <input type="number" id="inputQtd" value="1" min="1">
+    </div>
+    
+    <div id="statusMsg" class="status-msg"></div>
+
+    <div class="controles-grid no-print">
+        <button onclick="gerarPDFSintetico()" class="btn-pdf">📄 PDF</button>
+        <button onclick="exportarDados()" class="btn-export">💾 Backup</button>
+        <label class="btn-label btn-import">
+            📂 Importar
+            <input type="file" id="inputImport" accept=".json" style="display: none;" onchange="importarDados(event)">
+        </label>
+    </div>
+
+    <div class="tabs">
+        <h3 onclick="showTab('estoque')">📦 Estoque</h3>
+        <h3 onclick="showTab('historico')">History</h3>
+    </div>
+
+    <div id="tab-estoque" class="tab-content active">
+        <input type="text" id="inputBusca" placeholder="🔍 Buscar material..." onkeyup="filtrarTabela()" class="search-bar">
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr><th>Material</th><th>Qtd</th><th>Mín</th><th>Ação</th></tr>
+                </thead>
+                <tbody id="corpoEstoque"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-historico" class="tab-content">
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Tipo</th><th>Material</th><th>Resp.</th></tr>
+                </thead>
+                <tbody id="corpoHistorico"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* --- LÓGICA DA CÂMERA (QUAGGA) --- */
+    let cameraAtiva = false;
+
+    function toggleCamera() {
+        if (cameraAtiva) {
+            Quagga.stop();
+            cameraAtiva = false;
+            document.getElementById('interactive').innerHTML = "";
+        } else {
+            iniciarLeitor();
+            cameraAtiva = true;
+        }
+    }
+
+    function iniciarLeitor() {
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: { facingMode: "environment" } // Usa a câmera traseira
+            },
+            decoder: { readers: ["ean_reader", "code_128_reader", "upc_reader"] }
+        }, function(err) {
+            if (err) { console.error(err); return; }
+            Quagga.start();
+        });
+
+        Quagga.onDetected((data) => {
+            const code = data.codeResult.code;
+            document.getElementById('inputCodigo').value = code;
+            // Feedback tátil (vibração) se suportado
+            if (navigator.vibrate) navigator.vibrate(100);
+            
+            processarLeitura(); 
+            // Para a câmera após ler para economizar bateria (opcional)
+            // toggleCamera(); 
+        });
+    }
+
+    /* --- RESTANTE DA LÓGICA (MANTIDA E MELHORADA) --- */
+    let inventario = [];
+    let historico = [];
+
+    function processarLeitura() {
+        const cod = document.getElementById('inputCodigo').value.trim();
+        const qtd = parseInt(document.getElementById('inputQtd').value) || 1;
+        const operacao = document.querySelector('input[name="tipoOp"]:checked').value;
+        if (!cod) return;
+
+        let item = inventario.find(i => i.codigo === cod);
+
+        if (item) {
+            if (operacao === 'entrada') {
+                item.qtd += qtd;
+                registrarAcao(item, 'ENTRADA', qtd, "Sistema");
+                mostrarStatus(`+${qtd} ${item.nome}`, 'success');
+            } else {
+                if (item.qtd >= qtd) {
+                    item.qtd -= qtd;
+                    registrarAcao(item, 'SAÍDA', qtd, "Manual");
+                    mostrarStatus(`-${qtd} ${item.nome}`, 'success');
+                } else {
+                    mostrarStatus("Sem estoque!", "error");
+                }
+            }
+        } else {
+            if (operacao === 'entrada') {
+                const nome = prompt("Novo Material:");
+                if (nome) {
+                    inventario.push({ codigo: cod, sicom: "---", nome: nome, qtd: qtd, minimo: 5 });
+                    registrarAcao(inventario[inventario.length-1], 'CADASTRO', qtd, "Sistema");
+                }
+            }
+        }
+        atualizarTela();
+        document.getElementById('inputCodigo').value = "";
+    }
+
+    function registrarAcao(item, tipo, qtdMov, responsavel) {
+        historico.unshift({ data: new Date().toLocaleTimeString(), tipo, nome: item.nome, responsavel });
+    }
+
+    function atualizarTela() {
+        document.getElementById('corpoEstoque').innerHTML = inventario.map((i, index) => `
+            <tr class="${i.qtd <= i.minimo ? 'alerta' : ''}">
+                <td>${i.nome}</td>
+                <td><b>${i.qtd}</b></td>
+                <td>${i.minimo}</td>
+                <td><button onclick="editarItem(${index})">✏️</button></td>
+            </tr>
+        `).join('');
+        salvarLocal();
+    }
+
+    function showTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    function mostrarStatus(msg, cl) {
+        const s = document.getElementById('statusMsg');
+        s.innerText = msg; s.className = "status-msg " + cl;
+        setTimeout(() => s.innerText = "", 2000);
+    }
+
+    function salvarLocal() { localStorage.setItem('alm_app_db', JSON.stringify({inv: inventario, hist: historico})); }
+    
+    window.onload = () => {
+        const salvo = localStorage.getItem('alm_app_db');
+        if (salvo) { const d = JSON.parse(salvo); inventario = d.inv; historico = d.hist; }
+        atualizarTela();
+    };
+</script>
+</body>
+</html>
